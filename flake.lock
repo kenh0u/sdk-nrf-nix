@@ -2,22 +2,6 @@
   "nodes": {
     "nixpkgs": {
       "locked": {
-        "lastModified": 1772198003,
-        "narHash": "sha256-I45esRSssFtJ8p/gLHUZ1OUaaTaVLluNkABkk6arQwE=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "dd9b079222d43e1943b6ebd802f04fd959dc8e61",
-        "type": "github"
-      },
-      "original": {
-        "owner": "NixOS",
-        "ref": "nixos-unstable",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
-    "nixpkgs-2511": {
-      "locked": {
         "lastModified": 1772047000,
         "narHash": "sha256-7DaQVv4R97cii/Qdfy4tmDZMB2xxtyIvNGSwXBBhSmo=",
         "owner": "NixOS",
@@ -32,7 +16,7 @@
         "type": "github"
       }
     },
-    "nixpkgs-2511_2": {
+    "nixpkgs-2511": {
       "locked": {
         "lastModified": 1772047000,
         "narHash": "sha256-7DaQVv4R97cii/Qdfy4tmDZMB2xxtyIvNGSwXBBhSmo=",
@@ -67,14 +51,13 @@
     "root": {
       "inputs": {
         "nixpkgs": "nixpkgs",
-        "nixpkgs-2511": "nixpkgs-2511",
         "zephyr-sdk-nix": "zephyr-sdk-nix"
       }
     },
     "zephyr-sdk-nix": {
       "inputs": {
         "nixpkgs": "nixpkgs_2",
-        "nixpkgs-2511": "nixpkgs-2511_2"
+        "nixpkgs-2511": "nixpkgs-2511"
       },
       "locked": {
         "lastModified": 1772381499,

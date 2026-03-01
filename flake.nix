@@ -2,18 +2,16 @@
   description = "nRF Connect SDK Nix Flake";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    nixpkgs-2511.url = "github:NixOS/nixpkgs/nixos-25.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
     zephyr-sdk-nix.url = "github:kenh0u/zephyr-sdk-nix";
   };
 
-  outputs = { self, nixpkgs, nixpkgs-2511, zephyr-sdk-nix }: let
+  outputs = { self, nixpkgs,  zephyr-sdk-nix }: let
     systems = [ "x86_64-linux" ];
     forAllSystems = nixpkgs.lib.genAttrs systems;
   in {
     lib = forAllSystems (system: let
       pkgs = nixpkgs.legacyPackages.${system};
-      pkgs-2511 = nixpkgs-2511.legacyPackages.${system};
       zsdkLib = zephyr-sdk-nix.lib.${system};
     in {
       buildNrfApplication = {
@@ -29,7 +27,7 @@
         westBuildFlags ? []
       }: let
 
-        zephyrPython = pkgs-2511.python313.withPackages (ps: with ps; [
+        zephyrPython = pkgs.python313.withPackages (ps: with ps; [
           aenum
           anytree
           appdirs
@@ -105,7 +103,7 @@
           pname = "ncs-source-tree";
           version = "3.1.1";
 
-          nativeBuildInputs = [ pkgs.git pkgs.cacert pkgs-2511.python313Packages.west ];
+          nativeBuildInputs = [ pkgs.git pkgs.cacert pkgs.python313Packages.west ];
           outputHashMode = "recursive";
           outputHashAlgo = "sha256";
           outputHash = "sha256-HcxZb0KBLs9YkciLdNAOGQxOFB2SeOoV5ick9X+o9G4=";
@@ -168,11 +166,17 @@
 
         GIT_CONFIG_SYSTEM = "${gitSafeConfig}";
 
-        PYTHONPATH = "${zephyrPython}/${pkgs-2511.python313.sitePackages}";
+        PYTHONPATH = "${zephyrPython}/${pkgs.python313.sitePackages}";
 
         nativeBuildInputs = [
-          pkgs.git pkgs.cmake pkgs.ninja zephyrPython zephyrSdk
+          pkgs.git pkgs.cmake pkgs.ninja pkgs.dtc pkgs.gperf zephyrPython zephyrSdk
         ];
+
+        sourceRoot = pname;
+        unpackPhase = ''
+          cp -aT $src $pname
+          chmod -R u+w $pname
+        '';
 
         shellHook = ''
           export WEST_CONFIG_LOCAL=$(mktemp)
@@ -185,20 +189,54 @@
         '';
 
         configurePhase = ''
+          export XDG_CACHE_HOME="$(pwd)/.cache"
+          export HOME="$(pwd)/.home"
+          mkdir -p "$XDG_CACHE_HOME" "$HOME"
+
+          export HOME=$(mktemp -d)
           export WEST_CONFIG_LOCAL=$(mktemp)
           cp "${ncsSource}/.west/config" "$WEST_CONFIG_LOCAL"
           chmod +w "$WEST_CONFIG_LOCAL"
+          export PYTHONPATH="${zephyrPython}/${pkgs.python313.sitePackages}:$PYTHONPATH"
+          export Python3_EXECUTABLE="${zephyrPython}/bin/python3"
+
+          git init -q
+          git config user.name "Nix"
+          git config user.email "nix@localhost"
+          git config core.autocrlf false
+          git add .
+          git commit -q -m "Dummy commit for Zephyr sysbuild"
+          git tag -a v1.0.0 -m "Dummy version" || true
         '';
 
         buildPhase = ''
-          west build -p always -b ${board} ${pkgs.lib.optionalString sysbuild "--sysbuild"} ${pkgs.lib.concatStringsSep " " westBuildFlags}
+          export XDG_CACHE_HOME="$(pwd)/.cache"
+          export HOME="$(pwd)/.home"
+          mkdir -p "$XDG_CACHE_HOME" "$HOME"
+
+          export PYTHONPATH="${zephyrPython}/${pkgs.python313.sitePackages}:$PYTHONPATH"
+          export Python3_EXECUTABLE="${zephyrPython}/bin/python3"
+
+          if ! west build -p always -b ${board} ${pkgs.lib.optionalString sysbuild "--sysbuild"} ${pkgs.lib.concatStringsSep " " westBuildFlags}; then
+             echo "❌ Build failed! Dumping CMake logs for debugging:"
+             find build -name "CMakeOutput.log" -o -name "CMakeError.log" | while read -r file; do
+                echo "=== $file ==="
+                tail -n 50 "$file"
+             done
+             exit 1
+          fi
         '';
 
         installPhase = ''
           mkdir -p $out/bin
           cp build/merged.hex $out/bin/${pname}-merged.hex 2>/dev/null || true
-          cp build/zephyr/zephyr.hex $out/bin/${pname}.hex 2>/dev/null || true
-          cp build/zephyr/zephyr.elf $out/bin/${pname}.elf 2>/dev/null || true
+          if [ -f "build/${pname}/zephyr/zephyr.hex" ]; then
+            cp build/${pname}/zephyr/zephyr.hex $out/bin/${pname}.hex 2>/dev/null || true
+            cp build/${pname}/zephyr/zephyr.elf $out/bin/${pname}.elf 2>/dev/null || true
+          else
+            cp build/zephyr/zephyr.hex $out/bin/${pname}.hex 2>/dev/null || true
+            cp build/zephyr/zephyr.elf $out/bin/${pname}.elf 2>/dev/null || true
+          fi
         '';
       };
     });
