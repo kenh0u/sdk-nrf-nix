@@ -238,6 +238,8 @@
             cp build/zephyr/zephyr.elf $out/bin/${pname}.elf 2>/dev/null || true
           fi
         '';
+
+        dontFixup = true;
       };
     });
 
